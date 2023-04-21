@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(tracy_vendor)
+project(tracy_vendor LANGUAGES C CXX ASM)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -14,7 +14,11 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 find_package(ament_cmake_ros REQUIRED)
+
+find_package(Freetype REQUIRED)
+find_package(glfw3 REQUIRED)
 find_package(Threads REQUIRED)
+find_package(TBB REQUIRED)
 
 macro(set_option option help value)
     option(${option} ${help} ${value})
@@ -112,6 +116,170 @@ set(common_includes
     ${CMAKE_SOURCE_DIR}/tracy/public/common/TracyUwp.hpp
     ${CMAKE_SOURCE_DIR}/tracy/public/common/TracyYield.hpp)
 
+find_package(PkgConfig)
+pkg_check_modules(PC_DBUS QUIET dbus-1)
+find_library(DBUS_LIBRARIES
+    NAMES dbus-1
+    HINTS ${PC_DBUS_LIBDIR}
+          ${PC_DBUS_LIBRARY_DIRS}
+)
+find_path(DBUS_INCLUDE_DIR
+    NAMES dbus/dbus.h
+    HINTS ${PC_DBUS_INCLUDEDIR}
+          ${PC_DBUS_INCLUDE_DIRS}
+)
+get_filename_component(_DBUS_LIBRARY_DIR ${DBUS_LIBRARIES} PATH)
+find_path(DBUS_ARCH_INCLUDE_DIR
+    NAMES dbus/dbus-arch-deps.h
+    HINTS ${PC_DBUS_INCLUDEDIR}
+          ${PC_DBUS_INCLUDE_DIRS}
+          ${_DBUS_LIBRARY_DIR}
+          ${DBUS_INCLUDE_DIR}
+    PATH_SUFFIXES include
+)
+set(DBUS_INCLUDE_DIRS ${DBUS_INCLUDE_DIR} ${DBUS_ARCH_INCLUDE_DIR})
+
+pkg_check_modules(PC_CAPSTONE QUIET capstone)
+find_library(CAPSTONE_LIBRARIES
+    NAMES capstone
+    HINTS ${PC_CAPSTONE_LIBDIR}
+          ${PC_CAPSTONE_LIBRARY_DIRS}
+)
+find_path(CAPSTONE_INCLUDE_DIRS
+    NAMES capstone.h
+    HINTS ${PC_CAPSTONE_INCLUDEDIR}
+          ${PC_CAPSTONE_INCLUDE_DIRS}
+)
+
+add_executable(TracyProfiler
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/debug.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/entropy_common.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/error_private.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/fse_decompress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/pool.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/threading.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/xxhash.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/common/zstd_common.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/fse_compress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/hist.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/huf_compress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_compress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_compress_literals.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_compress_sequences.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_compress_superblock.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_double_fast.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_fast.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_lazy.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_ldm.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstdmt_compress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/compress/zstd_opt.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/decompress/huf_decompress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/decompress/huf_decompress_amd64.S
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/decompress/zstd_ddict.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/decompress/zstd_decompress_block.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/decompress/zstd_decompress.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/dictBuilder/cover.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/dictBuilder/divsufsort.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/dictBuilder/fastcover.c
+    ${CMAKE_SOURCE_DIR}/tracy/zstd/dictBuilder/zdict.c
+    ${CMAKE_SOURCE_DIR}/tracy/nfd/nfd_portal.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/winmainArchDiscovery.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/winmain.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/WindowPosition.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/RunQueue.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/ResolvService.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/main.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/IsElevated.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/imgui/imgui_impl_opengl3.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/imgui/imgui_impl_glfw.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/ImGuiContext.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/HttpRequest.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/Fonts.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/Filters.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/ConnectionHistory.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/profiler/src/BackendGlfw.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/imgui/imgui.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/imgui/imgui_draw.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/imgui/imgui_tables.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/imgui/imgui_widgets.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/imgui/misc/freetype/imgui_freetype.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyWorker.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyWeb.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_ZoneTimeline.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_ZoneInfo.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Utility.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_TraceInfo.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Timeline.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Statistics.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Samples.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Ranges.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Plots.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Playback.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Options.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_NotificationArea.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Navigation.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Messages.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Memory.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Locks.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_GpuTimeline.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_FrameTree.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_FrameTimeline.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_FrameOverview.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_FindZone.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_CpuData.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_ContextSwitch.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_ConnectionState.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Compare.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Callstack.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView_Annotations.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyView.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyUtility.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyUserData.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineItemThread.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineItemPlot.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineItemGpu.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineItemCpuData.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineItem.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTimelineController.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyThreadCompress.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTextureCompression.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTexture.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyTaskDispatch.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyStorage.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracySourceView.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracySourceTokenizer.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracySourceContents.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyProtoHistory.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyPrint.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyMouse.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyMmap.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyMicroArchitecture.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyMemory.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyImGui.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyFilesystem.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyFileselector.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyColor.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/server/TracyBadVersion.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/public/common/tracy_lz4hc.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/public/common/tracy_lz4.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/public/common/TracySystem.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/public/common/TracyStackFrames.cpp
+    ${CMAKE_SOURCE_DIR}/tracy/public/common/TracySocket.cpp
+)
+
+target_include_directories(TracyProfiler PRIVATE
+  ${CMAKE_SOURCE_DIR}/tracy/imgui
+  ${CAPSTONE_INCLUDE_DIRS}
+  ${DBUS_INCLUDE_DIRS}
+)
+
+target_link_libraries(TracyProfiler PRIVATE
+  Freetype::Freetype glfw Threads::Threads
+  ${DBUS_LIBRARIES}
+  ${CAPSTONE_LIBRARIES}
+  TBB::tbb
+  )
+
 install(
   TARGETS TracyClient EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
@@ -125,6 +293,7 @@ install(FILES ${client_includes}
         DESTINATION include/${PROJECT_NAME}/client)
 install(FILES ${common_includes}
         DESTINATION include/${PROJECT_NAME}/common)
+
 
 ament_export_targets(${PROJECT_NAME})
 ament_package()
